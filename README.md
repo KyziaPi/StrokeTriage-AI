@@ -18,7 +18,7 @@ A full-stack web application for stroke risk prediction using machine learning (
 - Vite
 
 ### Backend
-- Python 3.x
+- Python 3.10
 - Flask
 - Flask-CORS
 - NumPy
@@ -35,7 +35,7 @@ cd api
 2. Create a virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+venv\Scripts\activate
 ```
 
 3. Install Python dependencies:
@@ -69,7 +69,7 @@ The application will be available in the preview window.
 1. **Terminal 1** - Start Flask backend:
 ```bash
 cd api
-source venv/bin/activate
+venv\Scripts\activate
 python app.py
 ```
 
