@@ -1,48 +1,90 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
+import joblib
 
 app = Flask(__name__)
 CORS(app)
 
-# Mock SVM model prediction function
+# Load your trained SVM model and scaler
+# REPLACE filenames with your actual model and scaler files
+try:
+    model = joblib.load('svm_model.joblib')
+    scaler = joblib.load('scaler.joblib')  # Load StandardScaler
+    print("Model and scaler loaded successfully!")
+except FileNotFoundError as e:
+    print(f"WARNING: Model or scaler file not found: {e}")
+    print("Place your model file (svm_model.joblib) and scaler (scaler.joblib) in the api/ directory")
+    model = None
+    scaler = None
+
+# SVM model prediction function
 def predict_stroke(data):
     """
-    Mock SVM prediction based on input features.
-    In production, this would load a trained model and make actual predictions.
+    SVM prediction based on trained model.
     """
-    # Calculate risk score based on features (simplified heuristic)
-    risk_score = 0.0
+    if model is None:
+        # Fallback to mock prediction if model not loaded
+        risk_score = 0.0
+        if data['age'] > 60:
+            risk_score += 0.3
+        else:
+            risk_score += 0.1
+        if data['hypertension'] == 1:
+            risk_score += 0.2
+        if data['heart_disease'] == 1:
+            risk_score += 0.25
+        if data['avg_glucose_level'] > 200:
+            risk_score += 0.15
+        if data['bmi'] > 30:
+            risk_score += 0.1
+        if data['smoking_status'] == 2:
+            risk_score += 0.05
 
-    # Age factor
-    if data['age'] > 60:
-        risk_score += 0.3
+        has_stroke = 1 if risk_score > 0.5 else 0
+        probability = min(risk_score, 1.0)
     else:
-        risk_score += 0.1
+        # ============================================
+        # USE YOUR ACTUAL TRAINED MODEL HERE
+        # ============================================
 
-    # Hypertension
-    if data['hypertension'] == 1:
-        risk_score += 0.2
+        # Prepare input features in the same order as your training data
+        # Adjust this list to match your model's expected feature order
+        features = np.array([[
+            data['gender'],
+            data['age'],
+            data['hypertension'],
+            data['heart_disease'],
+            data['ever_married'],
+            data['work_type'],
+            data['Residence_type'],
+            data['avg_glucose_level'],
+            data['bmi'],
+            data['smoking_status']
+        ]])
 
-    # Heart disease
-    if data['heart_disease'] == 1:
-        risk_score += 0.25
+        # Apply StandardScaler transformation
+        if scaler is not None:
+            features = scaler.transform(features)
 
-    # Glucose level
-    if data['avg_glucose_level'] > 200:
-        risk_score += 0.15
+        # Make prediction using your trained model
+        prediction = model.predict(features)[0]
+        has_stroke = int(prediction)
 
-    # BMI
-    if data['bmi'] > 30:
-        risk_score += 0.1
-
-    # Smoking status
-    if data['smoking_status'] == 2:  # Currently smokes
-        risk_score += 0.05
-
-    # Determine prediction
-    has_stroke = 1 if risk_score > 0.5 else 0
-    probability = min(risk_score, 1.0)
+        # Get probability if your model supports it
+        if hasattr(model, 'predict_proba'):
+            # For models with probability support (most sklearn classifiers)
+            proba = model.predict_proba(features)[0]
+            probability = float(proba[1])  # Probability of stroke (class 1)
+        elif hasattr(model, 'decision_function'):
+            # For SVM with decision_function
+            decision = model.decision_function(features)[0]
+            # Convert decision function to probability-like score (0-1 range)
+            # Using sigmoid function
+            probability = float(1 / (1 + np.exp(-decision)))
+        else:
+            # Fallback if no probability available
+            probability = 1.0 if has_stroke else 0.0
 
     return {
         'prediction': has_stroke,
