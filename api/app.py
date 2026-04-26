@@ -1,56 +1,47 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
+import pandas as pd
 import joblib
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-# Load your trained SVM model and scaler
-# REPLACE filenames with your actual model and scaler files
+# --- Model Loading ---
+# We define the path to ensure the app looks in the correct directory
+MODEL_PATH = 'stroke-SVM.joblib'
+SCALER_PATH = 'stroke-scaler.joblib'
+
 try:
-    model = joblib.load('atroke-SVM.joblib')
-    scaler = joblib.load('stroke-scaler.joblib')  # Load StandardScaler
-    print("Model and scaler loaded successfully!")
+    model = joblib.load(MODEL_PATH)
+    scaler = joblib.load(SCALER_PATH)
+    print("✅ Model and scaler loaded successfully!")
 except FileNotFoundError as e:
-    print(f"WARNING: Model or scaler file not found: {e}")
-    print("Place your model file (svm_model.joblib) and scaler (scaler.joblib) in the api/ directory")
+    print(f"❌ WARNING: File not found: {e}")
     model = None
     scaler = None
 
-# SVM model prediction function
 def predict_stroke(data):
     """
-    SVM prediction based on trained model.
+    SVM prediction based on the stroke-SVM.joblib model.
     """
     if model is None:
-        # Fallback to mock prediction if model not loaded
-        risk_score = 0.0
-        if data['age'] > 60:
-            risk_score += 0.3
-        else:
-            risk_score += 0.1
-        if data['hypertension'] == 1:
-            risk_score += 0.2
-        if data['heart_disease'] == 1:
-            risk_score += 0.25
-        if data['avg_glucose_level'] > 200:
-            risk_score += 0.15
-        if data['bmi'] > 30:
-            risk_score += 0.1
-        if data['smoking_status'] == 2:
-            risk_score += 0.05
+        return {
+            'error': 'Model files not loaded on server',
+            'prediction': None,
+            'probability': 0.0,
+            'risk_level': 'unknown'
+        }
 
-        has_stroke = 1 if risk_score > 0.5 else 0
-        probability = min(risk_score, 1.0)
-    else:
-        # ============================================
-        # USE YOUR ACTUAL TRAINED MODEL HERE
-        # ============================================
-
-        # Prepare input features in the same order as your training data
-        # Adjust this list to match your model's expected feature order
-        features = np.array([[
+    try:
+        # 1. Prepare input features
+        feature_names = [
+        'gender', 'age', 'hypertension', 'heart_disease', 'ever_married',
+        'work_type', 'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status'
+        ]
+        # 2. Create a DataFrame instead of a simple NumPy array
+        features_df = pd.DataFrame([[
             data['gender'],
             data['age'],
             data['hypertension'],
@@ -61,65 +52,49 @@ def predict_stroke(data):
             data['avg_glucose_level'],
             data['bmi'],
             data['smoking_status']
-        ]])
+        ]], columns=feature_names)  
 
-        # Apply StandardScaler transformation
+        # 3. Scale using the DataFrame
         if scaler is not None:
-            features = scaler.transform(features)
-
-        # Make prediction using your trained model
-        prediction = model.predict(features)[0]
+            features_scaled = scaler.transform(features_df)
+            
+        # 4. Predict
+        prediction = model.predict(features_scaled)[0]
         has_stroke = int(prediction)
 
-        # Get probability if your model supports it
+        # 4. Calculate Probability
+        # SVMs don't always provide probabilities by default. 
+        # This logic handles both Platt scaling and Decision Function conversion.
         if hasattr(model, 'predict_proba'):
-            # For models with probability support (most sklearn classifiers)
-            proba = model.predict_proba(features)[0]
-            probability = float(proba[1])  # Probability of stroke (class 1)
+            # Requires model was trained with probability=True
+            proba = model.predict_proba(features_scaled)[0]
+            probability = float(proba[1]) 
         elif hasattr(model, 'decision_function'):
-            # For SVM with decision_function
-            decision = model.decision_function(features)[0]
-            # Convert decision function to probability-like score (0-1 range)
-            # Using sigmoid function
+            # Convert distance from hyperplane to a 0-1 score via Sigmoid
+            decision = model.decision_function(features_scaled)[0]
             probability = float(1 / (1 + np.exp(-decision)))
         else:
-            # Fallback if no probability available
             probability = 1.0 if has_stroke else 0.0
 
-    return {
-        'prediction': has_stroke,
-        'probability': probability,
-        'risk_level': 'high' if has_stroke else 'low'
-    }
+        return {
+            'prediction': has_stroke,
+            'probability': round(probability, 4),
+            'risk_level': 'high' if has_stroke == 1 else 'low'
+        }
+    
+    except Exception as e:
+        raise ValueError(f"Prediction Error: {str(e)}")
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
     return jsonify({
-        'status': 'healthy',
-        'model': 'SVM',
-        'version': '1.0'
+        'status': 'healthy' if model is not None else 'degraded',
+        'model_loaded': model is not None,
+        'scaler_loaded': scaler is not None
     })
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
-    """
-    Predict stroke risk based on patient data.
-
-    Expected JSON payload:
-    {
-        "gender": int (0=Male, 1=Female, 2=Other),
-        "age": float,
-        "hypertension": int (0=No, 1=Yes),
-        "heart_disease": int (0=No, 1=Yes),
-        "ever_married": int (0=No, 1=Yes),
-        "work_type": int (0=children, 1=Self-employed, 2=Never_worked, 3=Private, 4=Govt_job),
-        "Residence_type": int (0=Rural, 1=Urban),
-        "avg_glucose_level": float,
-        "bmi": float,
-        "smoking_status": int (0=never, 1=formerly, 2=smokes, 3=Unknown)
-    }
-    """
     try:
         data = request.get_json()
 
@@ -132,36 +107,29 @@ def predict():
 
         for field in required_fields:
             if field not in data:
-                return jsonify({
-                    'error': f'Missing required field: {field}'
-                }), 400
+                return jsonify({'error': f'Missing field: {field}'}), 400
 
-        # Make prediction
+        # Perform prediction
         result = predict_stroke(data)
 
         return jsonify({
             'success': True,
-            'data': result,
-            'input': data
+            'data': result
         })
 
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/model-info', methods=['GET'])
 def model_info():
-    """Return information about the model"""
     return jsonify({
-        'model': 'SVM',
+        'model': 'Support Vector Machine (SVM)',
+        'filename': 'stroke-SVM.joblib',
         'accuracy': 0.7407,
-        'precision': 0.1380,
         'recall': 0.82,
-        'f1_score': 0.2363,
-        'description': 'Support Vector Machine classifier for stroke prediction'
+        'status': 'Active'
     })
 
 if __name__ == '__main__':
+    # Using 0.0.0.0 allows access from other devices on your network
     app.run(debug=True, host='0.0.0.0', port=5000)
