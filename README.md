@@ -9,6 +9,9 @@ A full-stack web application for stroke risk prediction using machine learning (
 - **Risk Assessment**: Visual display of high/low risk with probability scores
 - **Model Performance**: View comparison of ML models (Logistic Regression, SVM, Random Forest)
 
+## Dataset
+From Kaggle, [Stroke Risk Dataset](https://www.kaggle.com/datasets/ranaghulamnabi/stroke-risk-dataset) by ranaghulamnabi
+
 ## Tech Stack
 
 ### Frontend
