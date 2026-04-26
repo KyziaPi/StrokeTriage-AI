@@ -9,8 +9,8 @@ CORS(app)
 # Load your trained SVM model and scaler
 # REPLACE filenames with your actual model and scaler files
 try:
-    model = joblib.load('svm_model.joblib')
-    scaler = joblib.load('scaler.joblib')  # Load StandardScaler
+    model = joblib.load('atroke-SVM.joblib')
+    scaler = joblib.load('stroke-scaler.joblib')  # Load StandardScaler
     print("Model and scaler loaded successfully!")
 except FileNotFoundError as e:
     print(f"WARNING: Model or scaler file not found: {e}")
