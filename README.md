@@ -30,28 +30,25 @@ From Kaggle, [Stroke Risk Dataset](https://www.kaggle.com/datasets/ranaghulamnab
 
 ### Backend Setup
 
-1. Allow local scripts to run without requiring digital signage
-```bash
-powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
-```
- 
-2. Navigate to the API directory:
+
+1. Navigate to the API directory:
 ```bash
 cd api
 ```
 
-3. Create a virtual environment:
+2. Create a virtual environment:
 ```bash
 python -m venv venv
+powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 venv\Scripts\activate
 ```
 
-4. Install Python dependencies:
+3. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-5. Run the Flask server:
+4. Run the Flask server:
 ```bash
 python app.py
 ```
