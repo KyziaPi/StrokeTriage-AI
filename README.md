@@ -60,7 +60,13 @@ The API will be available at `http://localhost:5000`
 
 ### Frontend Setup
 
-1. Install Node.js dependencies (from root directory):
+0. If first time installing node.js:
+```bash
+npm install -g pnpm
+pnpm -v
+```
+
+2. Install Node.js dependencies (from root directory):
 ```bash
 pnpm install
 ```
