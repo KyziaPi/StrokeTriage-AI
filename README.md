@@ -39,7 +39,7 @@ cd api
 2. Create a virtual environment:
 ```bash
 python -m venv venv
-powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 venv\Scripts\activate
 ```
 
